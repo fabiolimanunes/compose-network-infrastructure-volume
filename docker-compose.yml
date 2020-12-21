@@ -1,0 +1,74 @@
+version: '3.5'
+services:
+  api-build:
+    image: apirestful_flask:v1
+    build: ./apirestful_flask
+    entrypoint: "/bin/sh -c"
+    command: "exit 0"
+  database:
+    image: postgres:13-alpine
+    env_file: env/database.conf
+    networks:
+      - backend-web
+    volumes:
+      - sshfs:/var/lib/postgresql/data
+  api:
+    image: apirestful_flask:v1
+    env_file: env/api.conf
+    ports:
+      - 5000:5000
+    volumes:
+      - ./api:/usr/src/app/
+    networks:
+      - backend-web
+    depends_on:
+      - api-build
+      - database
+  web:
+    image: php:7.4.12-apache-buster
+    volumes:
+      - ./web:/var/www/html 
+    ports:
+      - 81:80 
+    networks:
+      - backend-web
+    depends_on:
+      - api
+  web2:
+    image: php:7.4.12-apache-buster
+    volumes:
+      - ./web:/var/www/html 
+    ports:
+      - 82:80 
+    networks:
+      - backend-web
+    depends_on:
+      - api
+  haproxy:
+    image: haproxy:1.6
+    restart: always
+    networks:
+      - frontend-web
+      - backend-web
+    ports:
+      - 80:80
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
+#volumes:
+#  db_volume:
+
+volumes:
+  sshfs:
+    name: sshfs
+    driver: vieux/sshfs:latest
+    driver_opts:
+      sshcmd: "root@192.168.122.69:/postgres"
+      password: "root"
+      allow_other: ""
+
+networks:
+    frontend-web:
+     internal: false
+    backend-web:
+     internal: true
